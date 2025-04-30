@@ -19,7 +19,8 @@ def pretty_print(
         content: bytes,
         space: str = ' ',
         indent: int = INDENT,
-        declaration: bool = True) -> bytes:
+        declaration: bool = True,
+        remove_blank_text: bool = False) -> bytes:
     """
     Pretty prints an XML content with specified indentation. Results are per
     the lxml tostring method, with pretty_print=True. In general, this will add
@@ -31,19 +32,21 @@ def pretty_print(
       space (str): The string used for indentation.
       indent (int): The number of spaces for each indentation level.
       declaration (bool): Should we add an XML declaration?
+      remove_blank_text (bool): Should we remove blank text nodes.
 
     Returns:
       bytes: The pretty printed XML content.
     """
     parser = etree.XMLParser(
-        remove_blank_text=False,
+        remove_blank_text=remove_blank_text,
         recover=True,
         strip_cdata=False)
     tree = etree.XML(content, parser=parser).getroottree()
     etree.indent(tree, space=space * indent)
     return etree.tostring(tree,
                           pretty_print=True,
-                          encoding=tree.docinfo.encoding,
+                          encoding=tree.
+                          docinfo.encoding,
                           xml_declaration=declaration)
 
 
@@ -82,7 +85,8 @@ def beautify(
         write: bool = False,
         endings: str = 'auto',
         self_closing: str = 'auto',
-        declaration: str = 'auto') -> bool:
+        declaration: str = 'auto',
+        remove_blank_text: bool = False) -> bool:
     """
     Beautifies, e.g. gently reformat the XML content of a file. Changes can be
     written back to the file.
@@ -95,6 +99,7 @@ def beautify(
       endings (str, optional): Types of line endings. Defaults to auto-detection.
       self_closing (str, optional): Pretty print self-closing tags? Defaults to auto-detection.
       declaration (str, optional): XML declaration? and its quoting style. Defaults to yes and auto-detection.
+      remove_blank_text (bool, optional): Remove blank text nodes. Defaults to False.
 
     Returns:
       bool: True if the file was beautified successfully, False otherwise.
@@ -124,7 +129,7 @@ def beautify(
     content = original
     for _ in range(retries):
         xml = pretty_print(original, space=space,
-                           indent=indent, declaration=xml_declaration)
+                           indent=indent, declaration=xml_declaration, remove_blank_text=remove_blank_text)
         if xml == content:
             break
         content = xml
@@ -311,6 +316,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     parser.add_argument(
+        '-b', '--remove-blank-text',
+        action='store_true',
+        dest='remove_blank_text',
+        help='Remove blank text nodes'
+    )
+
+    parser.add_argument(
         'filenames',
         nargs='*',
         help='Files to format'
@@ -326,6 +338,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     loglevel = os.environ.get(f'{ENV_PREFIX}LOG_LEVEL', args.loglevel)
     write: bool = str_to_bool(os.environ.get(
         f'{ENV_PREFIX}WRITE', str(args.write)))
+    remove_blank_test = str_to_bool(os.environ.get(
+        f'{ENV_PREFIX}REMOVE_BLANK_TEXT', str(args.write)))
     endings = os.environ.get(f'{ENV_PREFIX}LINE_ENDINGS', args.endings).lower()
     self_closing = os.environ.get(
         f'{ENV_PREFIX}SELF_CLOSING', args.self_closing).lower()
@@ -364,7 +378,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                             write,
                             endings,
                             self_closing,
-                            declaration):
+                            declaration,
+                            remove_blank_test):
                 errors += 1
         # Return the number of files not properly formatted + 2. This will be
         # reported to the OS as an error and enables better reporting, as
